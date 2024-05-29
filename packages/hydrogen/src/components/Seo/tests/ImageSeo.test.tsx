@@ -1,11 +1,11 @@
 import React from 'react';
 import {mount} from '@shopify/react-testing';
-import {Head} from '../../../client';
+import {Head} from '../../../foundation/Head/index.js';
 
-import {ImageSeo} from '../ImageSeo.client';
+import {ImageSeo} from '../ImageSeo.client.js';
 
-jest.mock('../../../client', () => ({
-  Head({children}) {
+jest.mock('../../../foundation/Head/Head.client', () => ({
+  Head({children}: {children: React.ReactNode}) {
     return children;
   },
 }));
@@ -14,7 +14,7 @@ describe('<ImageSeo />', () => {
   it('renders nothing in Head when no props were provided', () => {
     const wrapper = mount(<ImageSeo />);
 
-    expect(wrapper.find(Head).children.length).toBe(0);
+    expect(wrapper.find(Head)?.children.length).toBe(0);
   });
 
   it("renders <meta/> with property='og:image' and content from url prop", () => {

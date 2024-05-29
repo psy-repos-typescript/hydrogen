@@ -1,13 +1,11 @@
-import type {RequestHandler} from '../entry-server';
+import type {RequestHandler, ShopifyConfig} from '../shared-types.js';
 import type {IncomingMessage, NextFunction} from 'connect';
 import type {ServerResponse} from 'http';
 import type {ViteDevServer} from 'vite';
-import type {ShopifyConfig} from '../types';
-import {graphiqlHtml} from './graphiql';
+import {graphiqlHtml} from './graphiql.js';
 
 type HydrogenMiddlewareArgs = {
   dev?: boolean;
-  shopifyConfig?: ShopifyConfig;
   indexTemplate: string | ((url: string) => Promise<string>);
   getServerEntrypoint: () => any;
   devServer?: ViteDevServer;
@@ -15,26 +13,29 @@ type HydrogenMiddlewareArgs = {
 };
 
 export function graphiqlMiddleware({
-  shopifyConfig,
+  getShopifyConfig,
   dev,
 }: {
-  shopifyConfig: ShopifyConfig;
-  dev: boolean;
+  getShopifyConfig: (
+    request: IncomingMessage
+  ) => ShopifyConfig | Promise<ShopifyConfig>;
+  dev?: boolean;
 }) {
   return async function (
     request: IncomingMessage,
     response: ServerResponse,
     next: NextFunction
   ) {
-    const graphiqlRequest = dev && isGraphiqlRequest(request);
-
-    if (graphiqlRequest) {
+    if (dev && isGraphiqlRequest(request)) {
+      const shopifyConfig = await getShopifyConfig(request);
       return respondWithGraphiql(response, shopifyConfig);
     }
 
     next();
   };
 }
+
+let entrypointError: Error | null = null;
 
 /**
  * Provides middleware to Node.js Express-like servers. Used by the Hydrogen
@@ -47,13 +48,19 @@ export function hydrogenMiddleware({
   getServerEntrypoint,
   devServer,
 }: HydrogenMiddlewareArgs) {
+  if (dev && devServer) {
+    // Store this globally for devtools
+    // @ts-ignore
+    globalThis.__viteDevServer = devServer;
+  }
+
   /**
    * We're running in the Node.js runtime without access to `fetch`,
    * which is needed for proxy requests and server-side API requests.
    */
   const webPolyfills =
     !globalThis.fetch || !globalThis.ReadableStream
-      ? import('../utilities/web-api-polyfill')
+      ? import('../utilities/web-api-polyfill.js')
       : undefined;
 
   return async function (
@@ -64,36 +71,40 @@ export function hydrogenMiddleware({
     try {
       await webPolyfills;
 
-      const entrypoint = await getServerEntrypoint();
-      const handleRequest: RequestHandler = entrypoint.default ?? entrypoint;
+      const entrypoint = await Promise.resolve(getServerEntrypoint()).catch(
+        (error: Error) => {
+          // Errors are only thrown the first time we try to load the entry point.
+          // After refreshing the browser, this just loads an empty module
+          // and doesn't throw anymore. Store this error in the outer scope
+          // to keep throwing it on refresh until things are fixed.
+          entrypointError = error;
+        }
+      );
 
-      const eventResponse = await handleRequest(request, {
+      const handleRequest: RequestHandler = entrypoint?.default ?? entrypoint;
+
+      if (typeof handleRequest !== 'function') {
+        if (entrypointError) {
+          throw entrypointError;
+        } else {
+          // This means there is no error when loading the entry point but
+          // we are still not getting a function as the default export.
+          throw new Error(
+            'Something is wrong in your project. Make sure to add "export default renderHydrogen(...)" in your server entry file.'
+          );
+        }
+      }
+
+      entrypointError = null;
+
+      await handleRequest(request, {
         dev,
         cache,
         indexTemplate,
         streamableResponse: response,
       });
-
-      /**
-       * If a `Response` was returned, that means it was not streamed.
-       * Convert the response into a proper Node.js response.
-       */
-      if (eventResponse) {
-        eventResponse.headers.forEach((value: string, key: string) => {
-          response.setHeader(key, value);
-        });
-
-        response.statusCode = eventResponse.status;
-
-        if (eventResponse.body) {
-          response.write(eventResponse.body);
-        }
-
-        response.end();
-      }
     } catch (e: any) {
       if (dev && devServer) devServer.ssrFixStacktrace(e);
-      console.log(e.stack);
       response.statusCode = 500;
 
       /**
@@ -136,7 +147,7 @@ async function respondWithGraphiql(
 ) {
   if (!shopifyConfig) {
     throw new Error(
-      "You must provide shopifyConfig to Hydrogen's Vite middleware"
+      "You must provide a 'shopify' property in your Hydrogen config file"
     );
   }
 

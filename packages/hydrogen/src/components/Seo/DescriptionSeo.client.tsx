@@ -1,9 +1,12 @@
 import React from 'react';
-import {Head} from '../../client';
+import {Head} from '../../foundation/Head/index.js';
+import type {Seo as SeoType} from '../../storefront-api-types.js';
 
-import type {Description} from './types';
-
-export function DescriptionSeo({description}: {description?: Description}) {
+export function DescriptionSeo({
+  description,
+}: {
+  description?: SeoType['description'];
+}) {
   if (!description) {
     return null;
   }

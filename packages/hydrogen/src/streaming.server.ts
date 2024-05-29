@@ -1,17 +1,32 @@
-import {
-  // @ts-ignore
-  renderToPipeableStream as _ssrRenderToPipeableStream, // Only available in Node context
-  // @ts-ignore
-  renderToReadableStream as _ssrRenderToReadableStream, // Only available in Browser/Worker context
+export {
+  renderToPipeableStream as ssrRenderToPipeableStream, // Only available in Node context
+  renderToReadableStream as ssrRenderToReadableStream, // Only available in Browser/Worker context
 } from 'react-dom/server';
+
 // @ts-ignore
 import {renderToReadableStream as _rscRenderToReadableStream} from '@shopify/hydrogen/vendor/react-server-dom-vite/writer.browser.server';
 // @ts-ignore
 import {createFromReadableStream as _createFromReadableStream} from '@shopify/hydrogen/vendor/react-server-dom-vite';
-import type {Writable} from 'stream';
+
+// From Flight flow types
+type ServerContextJSONValue =
+  | string
+  | boolean
+  | number
+  | null
+  | Readonly<ServerContextJSONValueCircular>
+  | {[key: string]: ServerContextJSONValueCircular};
+
+interface ServerContextJSONValueCircular
+  extends Array<ServerContextJSONValue> {}
 
 export const rscRenderToReadableStream = _rscRenderToReadableStream as (
-  App: JSX.Element
+  App: JSX.Element,
+  options?: {
+    onError?: (error: Error) => void;
+    context?: Array<[string, ServerContextJSONValue]>;
+    identifierPrefix?: string;
+  }
 ) => ReadableStream<Uint8Array>;
 
 export const createFromReadableStream = _createFromReadableStream as (
@@ -19,57 +34,6 @@ export const createFromReadableStream = _createFromReadableStream as (
 ) => {
   readRoot: () => JSX.Element;
 };
-
-type StreamOptions = {
-  nonce?: string;
-  onCompleteShell?: () => void;
-  onCompleteAll?: () => void;
-  onError?: (error: Error) => void;
-  bootstrapScripts?: string[];
-  bootstrapModules?: string[];
-};
-
-export const ssrRenderToPipeableStream = _ssrRenderToPipeableStream as (
-  App: JSX.Element,
-  options: StreamOptions
-) => {pipe: Writable['pipe']};
-
-export const ssrRenderToReadableStream = _ssrRenderToReadableStream as (
-  App: JSX.Element,
-  options: StreamOptions
-) => ReadableStream<Uint8Array>;
-
-export function supportsReadableStream() {
-  try {
-    new ReadableStream();
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-let cachedStreamingSupport: boolean;
-export async function isStreamingSupported() {
-  if (cachedStreamingSupport === undefined) {
-    try {
-      const rs = new ReadableStream({
-        start(controller) {
-          controller.close();
-        },
-      });
-
-      // This will throw in CFW until streaming
-      // is supported. It works in Miniflare.
-      await new Response(rs).text();
-
-      cachedStreamingSupport = true;
-    } catch (_) {
-      cachedStreamingSupport = false;
-    }
-  }
-
-  return cachedStreamingSupport;
-}
 
 export async function bufferReadableStream(
   reader: ReadableStreamDefaultReader,
@@ -83,7 +47,7 @@ export async function bufferReadableStream(
     if (done) break;
 
     const stringValue =
-      typeof value === 'string' ? value : decoder.decode(value);
+      typeof value === 'string' ? value : decoder.decode(value, {stream: true});
 
     result += stringValue;
 

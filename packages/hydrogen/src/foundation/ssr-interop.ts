@@ -6,13 +6,13 @@
  */
 
 import {useContext, Context} from 'react';
-import type {ServerComponentRequest} from '../framework/Hydration/ServerComponentRequest.server';
-//@SSR import {useServerRequest} from './ServerRequestProvider';
+import type {HydrogenRequest} from './HydrogenRequest/HydrogenRequest.server.js';
+//@SSR import {useServerRequest} from './ServerRequestProvider/index.js';
 
 // This is replaced by Vite to import.meta.env.SSR
 export const META_ENV_SSR = false;
 
-type ServerGetter<T> = (request: ServerComponentRequest) => T;
+type ServerGetter<T> = (request: HydrogenRequest) => T;
 
 const reactContextType = Symbol.for('react.context');
 
@@ -30,7 +30,7 @@ const reactContextType = Symbol.for('react.context');
  * The returned type depends on what the server getter returns.
  * @example
  * ```js
- * import {MyClientContext} from './my-client-react-context-provider';
+ * import {MyClientContext} from './my-client-react-context-provider.js';
  * useEnvContext(req => req.ctx.myServerContext, MyClientContext)
  * ```
  */
@@ -41,6 +41,6 @@ export function useEnvContext<T>(
   //@SSR if (META_ENV_SSR) return serverGetter(useServerRequest());
 
   return clientFallback && clientFallback.$$typeof === reactContextType
-    ? useContext(clientFallback as Context<T>)
+    ? useContext(clientFallback as Context<T>) // eslint-disable-line react-hooks/rules-of-hooks
     : (clientFallback as T);
 }

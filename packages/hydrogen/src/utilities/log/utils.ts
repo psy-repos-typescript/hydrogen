@@ -1,12 +1,11 @@
-import type {RenderType} from './log';
+import type {RenderType} from './log.js';
 
 export function findQueryName(key: string) {
-  const decodeKey = decodeURIComponent(key);
-  const match = decodeKey.match(/query ([^\s\()]*)\s?(|\(\{)/);
-  if (match && match.length > 1) {
-    return match[1];
+  if (key.length < 100) {
+    return key.replace(__HYDROGEN_CACHE_ID__, '').replace(/"/g, '');
   }
-  return '<unknown>';
+
+  return key.match(/query\s+([^\s({]+)/)?.[1] || '<unknown>';
 }
 
 export function parseUrl(type: RenderType, url: string) {

@@ -1,11 +1,13 @@
 import React from 'react';
-import {useShop} from '../../foundation/useShop';
-import {useLoadScript} from '../../hooks/useLoadScript/useLoadScript';
+import {useShop} from '../../foundation/useShop/index.js';
+import {useLoadScript} from '../../hooks/useLoadScript/useLoadScript.client.js';
 
 // By using 'never' in the "or" cases below, it makes these props "exclusive" and means that you cannot pass both of them; you must pass either one OR the other.
-export type ShopPayButtonProps = {
+type ShopPayButtonProps = {
   /** A string of classes to apply to the `div` that wraps the Shop Pay button. */
   className?: string;
+  /** A string that's applied to the [CSS custom property (variable)](https://developer.mozilla.org/en-US/docs/Web/CSS/--*) `--shop-pay-button-width` for the [Buy with Shop Pay component](https://shopify.dev/custom-storefronts/tools/web-components#buy-with-shop-pay-component). */
+  width?: string;
 } & (
   | {
       /** An array of IDs of the variants to purchase with Shop Pay. This will only ever have a quantity of 1 for each variant. If you want to use other quantities, then use 'variantIdsAndQuantities'. */
@@ -25,7 +27,6 @@ export type ShopPayButtonProps = {
 );
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       'shop-pay-button': {
@@ -36,7 +37,7 @@ declare global {
   }
 }
 
-const URL = 'https://cdn.shopify.com/shopifycloud/shop-js/v0.8/client.js';
+const URL = 'https://cdn.shopify.com/shopifycloud/shop-js/v1.0/client.js';
 
 /**
  * The `ShopPayButton` component renders a button that redirects to the Shop Pay checkout.
@@ -45,6 +46,7 @@ export function ShopPayButton({
   variantIds,
   className,
   variantIdsAndQuantities,
+  width,
 }: ShopPayButtonProps) {
   const {storeDomain} = useShop();
   const shopPayLoadedStatus = useLoadScript(URL);
@@ -75,8 +77,15 @@ export function ShopPayButton({
     throw new Error(MissingPropsErrorMessage);
   }
 
+  const style = width
+    ? ({
+        '--shop-pay-button-width': width,
+      } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className={className} tabIndex={1}>
+    /* eslint-disable jsx-a11y/no-noninteractive-tabindex */
+    <div className={className} tabIndex={0} style={style}>
       {shopPayLoadedStatus === 'done' && (
         <shop-pay-button
           store-url={`https://${storeDomain}`}
@@ -84,6 +93,7 @@ export function ShopPayButton({
         />
       )}
     </div>
+    /* eslint-enable jsx-a11y/no-noninteractive-tabindex */
   );
 }
 
@@ -92,17 +102,7 @@ export function ShopPayButton({
  */
 export function getIdFromGid(id?: string) {
   if (!id) return;
-
-  let gid: string;
-
-  // atob() / Buffer required for SFAPI 2022-01. Remove atob() when upgrading to 2022-04
-  if (typeof window?.atob !== 'undefined') {
-    gid = window.atob(id);
-  } else {
-    gid = Buffer.from(id, 'base64').toString('ascii');
-  }
-
-  return gid.split('/').pop();
+  return id.split('/').pop();
 }
 
 export const MissingPropsErrorMessage = `You must pass in either "variantIds" or "variantIdsAndQuantities" to ShopPayButton`;

@@ -1,7 +1,7 @@
-import {ServerComponentRequest} from '../../framework/Hydration/ServerComponentRequest.server';
+import {HydrogenRequest} from '../../foundation/HydrogenRequest/HydrogenRequest.server.js';
 import {yellow, red, green, italic, lightBlue} from 'kolorist';
-import {getTime} from '../timing';
-import {parseUrl} from './utils';
+import {getTime} from '../timing.js';
+import {parseUrl} from './utils.js';
 
 /** The `log` utility is a function that's used for logging debugging, warning, and error information about the application.
  * Use this utility by importing `log` from `@shopify/hydrogen`, or by using a `log` prop passed to each page
@@ -9,18 +9,13 @@ import {parseUrl} from './utils';
  * current request in progress.
  */
 
-/* eslint-disable no-var */
-/* eslint-disable @typescript-eslint/no-namespace */
-declare namespace globalThis {
-  var __logger: Logger;
-}
-
+type LoggerMethod = (...args: Array<any>) => void | Promise<any>;
 export interface Logger {
-  trace: (...args: Array<any>) => void;
-  debug: (...args: Array<any>) => void;
-  warn: (...args: Array<any>) => void;
-  error: (...args: Array<any>) => void;
-  fatal: (...args: Array<any>) => void;
+  trace: LoggerMethod;
+  debug: LoggerMethod;
+  warn: LoggerMethod;
+  error: LoggerMethod;
+  fatal: LoggerMethod;
   options: () => LoggerOptions;
 }
 
@@ -28,59 +23,99 @@ export type LoggerOptions = {
   showCacheControlHeader?: boolean;
   showCacheApiStatus?: boolean;
   showQueryTiming?: boolean;
+  showUnusedQueryProperties?: boolean;
 };
+
+export type LoggerConfig = Partial<Exclude<Logger, 'options'>> & LoggerOptions;
 
 export type RenderType = 'str' | 'rsc' | 'ssr' | 'api';
 
-const defaultLogger = {
-  trace(context: {[key: string]: any}, ...args: Array<any>) {
+const defaultLogger: Logger = {
+  trace(context, ...args) {
     // Re-enable following line to show trace debugging information
     // console.log(context.id, ...args);
   },
-  debug(context: {[key: string]: any}, ...args: Array<any>) {
+  debug(context, ...args) {
     console.log(...args);
   },
-  warn(context: {[key: string]: any}, ...args: Array<any>) {
+  warn(context, ...args) {
     console.warn(yellow('WARN: '), ...args);
   },
-  error(context: {[key: string]: any}, ...args: Array<any>) {
-    console.error(red('ERROR: '), ...args);
+  error(context, error, ...extra) {
+    const url = context ? ` ${context.url}` : '';
+    const extraMessage = extra.length ? `\n${extra.join('\n')}` : '';
+
+    if (error instanceof Error) {
+      console.error(
+        red(`Error processing route:${url}\n${error.stack}${extraMessage}`)
+      );
+    } else {
+      console.error(red(`Error:${url} ${error}${extraMessage}`));
+    }
   },
-  fatal(context: {[key: string]: any}, ...args: Array<any>) {
+  fatal(context, ...args) {
     console.error(red('FATAL: '), ...args);
   },
-  options: () => ({}),
+  options: () => ({} as LoggerOptions),
 };
 
-globalThis.__logger = defaultLogger as Logger;
+let currentLogger = defaultLogger as Logger;
 
-function buildLogger(this: any): Logger {
+function doLog(
+  method: keyof typeof defaultLogger,
+  request: Partial<HydrogenRequest>,
+  ...args: any[]
+) {
+  try {
+    const maybePromise = currentLogger[method](request, ...args);
+    if (maybePromise instanceof Promise) {
+      request?.ctx?.runtime?.waitUntil?.(
+        maybePromise.catch((e) => {
+          const message = e instanceof Error ? e.stack : e;
+          defaultLogger.error(
+            `Promise error from the custom logging implementation for logger.${method} failed:\n${message}`
+          );
+        })
+      );
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.stack : e;
+    defaultLogger.error(
+      `The custom logging implementation for logger.${method} failed:\n${message}`
+    );
+  }
+}
+
+export function getLoggerWithContext(
+  context: Partial<HydrogenRequest>
+): Logger {
   return {
-    trace: (...args) => globalThis.__logger.trace(this, ...args),
-    debug: (...args) => globalThis.__logger.debug(this, ...args),
-    warn: (...args) => globalThis.__logger.warn(this, ...args),
-    error: (...args) => globalThis.__logger.error(this, ...args),
-    fatal: (...args) => globalThis.__logger.fatal(this, ...args),
-    options: () => globalThis.__logger.options(),
+    trace: (...args) => doLog('trace', context, ...args),
+    debug: (...args) => doLog('debug', context, ...args),
+    warn: (...args) => doLog('warn', context, ...args),
+    error: (...args) => doLog('error', context, ...args),
+    fatal: (...args) => doLog('fatal', context, ...args),
+    options: () => currentLogger.options(),
   };
 }
 
-export const log: Logger = buildLogger.call({});
+export const log: Logger = getLoggerWithContext({});
 
-export function getLoggerWithContext(context: any = {}): Logger {
-  return buildLogger.call(context);
-}
+export function setLogger(config?: LoggerConfig) {
+  if (!config) {
+    currentLogger = defaultLogger;
+    return;
+  }
 
-export function setLogger(newLogger: Logger) {
-  globalThis.__logger = newLogger;
-}
+  const options = {} as LoggerOptions;
+  currentLogger = {...defaultLogger, ...config, options: () => options};
 
-export function setLoggerOptions(options: LoggerOptions) {
-  globalThis.__logger.options = () => options;
-}
-
-export function resetLogger() {
-  globalThis.__logger = defaultLogger;
+  for (const key of Object.keys(config) as (keyof LoggerOptions)[]) {
+    if (!(key in defaultLogger)) {
+      delete currentLogger[key as keyof Logger];
+      options[key] = config[key];
+    }
+  }
 }
 
 const SERVER_RESPONSE_MAP: Record<string, string> = {
@@ -91,8 +126,9 @@ const SERVER_RESPONSE_MAP: Record<string, string> = {
 
 export function logServerResponse(
   type: RenderType,
-  request: ServerComponentRequest,
-  responseStatus: number
+  request: HydrogenRequest,
+  responseStatus: number,
+  didError: boolean
 ) {
   const log = getLoggerWithContext(request);
   const coloredResponseStatus =
@@ -113,6 +149,8 @@ export function logServerResponse(
   const url = parseUrl(type, request.url);
 
   log.debug(
-    `${request.method} ${styledType} ${coloredResponseStatus} ${paddedTiming} ${url}`
+    `${request.method} ${styledType} ${coloredResponseStatus} ${
+      didError || responseStatus >= 400 ? red('error') : green('ok   ')
+    } ${paddedTiming} ${url}`
   );
 }

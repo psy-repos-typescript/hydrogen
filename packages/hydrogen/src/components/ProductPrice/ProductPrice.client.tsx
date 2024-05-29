@@ -1,12 +1,15 @@
-import React, {ElementType} from 'react';
-import {MoneyV2, UnitPriceMeasurement} from '../../graphql/types/types';
-import {Money, MoneyProps} from '../Money';
-import {useProduct} from '../ProductProvider';
-import {Props} from '../types';
-import {UnitPrice} from '../UnitPrice';
+import React from 'react';
+import type {
+  MoneyV2,
+  UnitPriceMeasurement,
+  Product,
+} from '../../storefront-api-types.js';
+import {Money} from '../Money/index.js';
+import type {PartialDeep} from 'type-fest';
+import {flattenConnection} from '../../utilities/flattenConnection/index.js';
 
-export interface ProductPriceProps<TTag>
-  extends Omit<MoneyProps<TTag>, 'data'> {
+export interface ProductPriceProps {
+  data: PartialDeep<Product>;
   /** The type of price. Valid values: `regular` (default) or `compareAt`. */
   priceType?: 'regular' | 'compareAt';
   /** The type of value. Valid values: `min` (default), `max` or `unit`. */
@@ -17,28 +20,31 @@ export interface ProductPriceProps<TTag>
 
 /**
  * The `ProductPrice` component renders a `Money` component with the product
- * [`priceRange`](/api/storefront/reference/products/productpricerange)'s `maxVariantPrice` or `minVariantPrice`, for either the regular price or compare at price range. It must be a descendent of the `ProductProvider` component.
+ * [`priceRange`](https://shopify.dev/api/storefront/reference/products/productpricerange)'s `maxVariantPrice` or `minVariantPrice`, for either the regular price or compare at price range.
  */
-export function ProductPrice<TTag extends ElementType>(
-  props: Props<TTag> & ProductPriceProps<TTag>
+export function ProductPrice(
+  props: Omit<React.ComponentProps<typeof Money>, 'data' | 'measurement'> &
+    ProductPriceProps
 ) {
-  const product = useProduct();
   const {
     priceType = 'regular',
     variantId,
     valueType = 'min',
+    data: product,
     ...passthroughProps
   } = props;
 
   if (product == null) {
-    throw new Error('Expected a ProductProvider context, but none was found');
+    throw new Error(`<ProductPrice/> requires a product as the 'data' prop`);
   }
 
-  let price: MoneyV2 | undefined | null;
-  let measurement: UnitPriceMeasurement | undefined | null;
+  let price: Partial<MoneyV2> | undefined | null;
+  let measurement: Partial<UnitPriceMeasurement> | undefined | null;
 
   const variant = variantId
-    ? product?.variants?.find((variant) => variant.id === variantId)
+    ? flattenConnection(product?.variants ?? {}).find(
+        (variant) => variant?.id === variantId
+      ) ?? null
     : null;
 
   if (priceType === 'compareAt') {
@@ -66,13 +72,13 @@ export function ProductPrice<TTag extends ElementType>(
     }
   }
 
-  if (price == null) {
+  if (!price) {
     return null;
   }
 
   if (measurement) {
     return (
-      <UnitPrice {...passthroughProps} data={price} measurement={measurement} />
+      <Money {...passthroughProps} data={price} measurement={measurement} />
     );
   }
 

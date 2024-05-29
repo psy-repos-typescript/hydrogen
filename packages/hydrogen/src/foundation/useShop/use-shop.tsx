@@ -1,8 +1,10 @@
-import {ShopifyContext} from '../ShopifyProvider';
-import {useEnvContext} from '../ssr-interop';
+import {ShopifyContext} from '../ShopifyProvider/index.js';
+import {useEnvContext} from '../ssr-interop.js';
 
 /**
- * The `useShop` hook provides access to values within `shopify.config.js`. It must be a descendent of a `ShopifyProvider` component.
+ * The `useShop` hook provides access to values within
+ * [the `shopify` property in the `hydrogen.config.js` file](https://shopify.dev/custom-storefronts/hydrogen/configuration).
+ * The `useShop` hook must be a descendent of a `ShopifyProvider` component.
  */
 export function useShop() {
   const config = useEnvContext((req) => req.ctx.shopifyConfig, ShopifyContext);

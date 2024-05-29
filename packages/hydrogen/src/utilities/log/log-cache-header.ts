@@ -1,12 +1,10 @@
-import {ServerComponentRequest} from '../../framework/Hydration/ServerComponentRequest.server';
-import {ServerComponentResponse} from '../../framework/Hydration/ServerComponentResponse.server';
-import {QueryKey} from '../../types';
-import {hashKey} from '../../framework/cache';
-import {findQueryName, parseUrl} from './utils';
+import {HydrogenRequest} from '../../foundation/HydrogenRequest/HydrogenRequest.server.js';
+import {HydrogenResponse} from '../../foundation/HydrogenResponse/HydrogenResponse.server.js';
+import {QueryKey} from '../../types.js';
+import {hashKey} from '../hash.js';
+import {findQueryName, parseUrl} from './utils.js';
 import {gray} from 'kolorist';
-import {getLoggerWithContext} from './log';
-
-import type {RenderType} from './log';
+import {getLoggerWithContext, type RenderType} from './log.js';
 
 const color = gray;
 
@@ -16,7 +14,7 @@ export type QueryCacheControlHeaders = {
 };
 
 export function collectQueryCacheControlHeaders(
-  request: ServerComponentRequest,
+  request: HydrogenRequest,
   queryKey: QueryKey,
   cacheControlHeader: string | null
 ) {
@@ -28,8 +26,8 @@ export function collectQueryCacheControlHeaders(
 
 export function logCacheControlHeaders(
   type: RenderType,
-  request: ServerComponentRequest,
-  response?: ServerComponentResponse
+  request: HydrogenRequest,
+  response?: HydrogenResponse
 ) {
   const log = getLoggerWithContext(request);
   if (!log.options().showCacheControlHeader) {

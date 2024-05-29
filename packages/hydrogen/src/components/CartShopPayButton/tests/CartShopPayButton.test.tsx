@@ -1,11 +1,13 @@
 import React from 'react';
-import {CartShopPayButton} from '../CartShopPayButton.client';
-import {CartProvider} from '../../CartProvider';
-import {CART_WITH_LINES} from '../../CartProvider/tests/fixtures';
-import {ShopPayButton} from '../../ShopPayButton';
-import {mountWithProviders} from '../../../utilities/tests/shopifyMount';
+import {CartShopPayButton} from '../CartShopPayButton.client.js';
+import {CartProvider} from '../../CartProvider/index.js';
+import {CART_WITH_LINES} from '../../CartProvider/tests/fixtures.js';
+import {ShopPayButton} from '../../ShopPayButton/index.js';
+import {mountWithProviders} from '../../../utilities/tests/shopifyMount.js';
 
 describe('CartShopPayButton', () => {
+  const fetch = global.fetch;
+
   beforeEach(() => {
     // @ts-ignore
     global.fetch = jest.fn(async (_url, _init) => {
@@ -16,6 +18,10 @@ describe('CartShopPayButton', () => {
           }),
       };
     });
+  });
+
+  afterEach(() => {
+    global.fetch = fetch;
   });
 
   it('renders a ShopPayButton', () => {

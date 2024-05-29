@@ -1,17 +1,17 @@
 import React from 'react';
 import {mount} from '@shopify/react-testing';
 
-import {Seo} from '../Seo.client';
+import {Seo} from '../Seo.client.js';
 
-import {DefaultPageSeo} from '../DefaultPageSeo.client';
-import {HomePageSeo} from '../HomePageSeo.client';
-import {ProductSeo} from '../ProductSeo.client';
-import {CollectionSeo} from '../CollectionSeo.client';
-import {PageSeo} from '../PageSeo.client';
+import {DefaultPageSeo} from '../DefaultPageSeo.client.js';
+import {HomePageSeo} from '../HomePageSeo.client.js';
+import {ProductSeo} from '../ProductSeo.client.js';
+import {CollectionSeo} from '../CollectionSeo.client.js';
+import {PageSeo} from '../PageSeo.client.js';
 
 const mockUrl = 'https://store-name.com/';
 
-jest.mock('../../../foundation', () => ({
+jest.mock('../../../foundation/useUrl/useUrl', () => ({
   useUrl: () => new URL(mockUrl),
 }));
 
@@ -63,6 +63,7 @@ describe('<Seo />', () => {
       title: 'test title',
       description: 'test description',
     };
+    // @ts-ignore
     const wrapper = mount(<Seo type="defaultSeo" data={defaultPage} />);
 
     expect(wrapper).toContainReactComponent(DefaultPageSeo, {
@@ -73,6 +74,7 @@ describe('<Seo />', () => {
 
   it('renders <HomePageSeo /> type is homepage', () => {
     const homePage = {title: 'test title'};
+    // @ts-ignore
     const wrapper = mount(<Seo type="homepage" data={homePage} />);
 
     expect(wrapper).toContainReactComponent(HomePageSeo, {

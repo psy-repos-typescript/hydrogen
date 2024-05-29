@@ -1,53 +1,41 @@
-import type {HydrogenVitePluginOptions, ShopifyConfig} from '../types';
-import hydrogenConfig from './plugins/vite-plugin-hydrogen-config';
+import type {HydrogenVitePluginOptions} from './types.js';
+import hydrogenConfig from './plugins/vite-plugin-hydrogen-config.js';
 import type {Plugin} from 'vite';
-import hydrogenMiddleware, {
-  HYDROGEN_DEFAULT_SERVER_ENTRY,
-} from './plugins/vite-plugin-hydrogen-middleware';
-import hydrogenClientMiddleware from './plugins/vite-plugin-hydrogen-client-middleware';
-import platformEntry from './plugins/vite-plugin-platform-entry';
-// @ts-ignore
-import rsc from '@shopify/hydrogen/vendor/react-server-dom-vite/plugin';
-import ssrInterop from './plugins/vite-plugin-ssr-interop';
-import purgeQueryCache from './plugins/vite-plugin-purge-query-cache';
-import hydrationAutoImport from './plugins/vite-plugin-hydration-auto-import';
+import hydrogenMiddleware from './plugins/vite-plugin-hydrogen-middleware.js';
+import hydrogenClientComponentsCache from './plugins/vite-plugin-hydrogen-client-components-cache.js';
+import hydrogenVirtualFiles from './plugins/vite-plugin-hydrogen-virtual-files.js';
+import platformEntry from './plugins/vite-plugin-platform-entry.js';
+import rsc from './plugins/vite-plugin-hydrogen-rsc.js';
+import ssrInterop from './plugins/vite-plugin-ssr-interop.js';
+import hydrationAutoImport from './plugins/vite-plugin-hydration-auto-import.js';
 import inspect from 'vite-plugin-inspect';
 import react from '@vitejs/plugin-react';
-import path from 'path';
+import cssRsc from './plugins/vite-plugin-css-rsc.js';
+import cssModulesRsc from './plugins/vite-plugin-css-modules-rsc.js';
+import clientImports from './plugins/vite-plugin-client-imports.js';
+import suppressWarnings from './plugins/vite-plugin-hydrogen-suppress-warnings.js';
+import assetsVersion from './plugins/vite-plugin-assets-version.js';
 
-export default (
-  shopifyConfig: ShopifyConfig,
-  pluginOptions: HydrogenVitePluginOptions = {}
-) => {
+const hydrogenPlugin = (pluginOptions: HydrogenVitePluginOptions = {}) => {
   return [
     process.env.VITE_INSPECT && inspect(),
-
-    hydrogenConfig(),
-    hydrogenClientMiddleware(),
-    hydrogenMiddleware(shopifyConfig, pluginOptions),
+    hydrogenConfig(pluginOptions),
+    hydrogenClientComponentsCache(),
+    clientImports(),
+    hydrogenMiddleware(pluginOptions),
+    hydrogenVirtualFiles(pluginOptions),
     react(),
     hydrationAutoImport(),
     ssrInterop(),
-    rsc({
-      clientComponentPaths: [
-        path.join(
-          path.dirname(require.resolve('@shopify/hydrogen/package.json'))
-        ),
-      ],
-      isServerComponentImporterAllowed(importer: string, source: string) {
-        // Always allow the entry server (e.g. App.server.jsx) to be imported
-        // in other files such as worker.js or server.js.
-        const entryServer =
-          process.env.HYDROGEN_SERVER_ENTRY || HYDROGEN_DEFAULT_SERVER_ENTRY;
-
-        return (
-          source.includes(entryServer) ||
-          // TODO update this after handleEvent is replaced with handleRequest
-          /(handle-worker-event|index|entry-server)\.js/.test(importer)
-        );
-      },
-    }),
+    pluginOptions.experimental?.css === 'global' ? cssRsc() : cssModulesRsc(),
+    rsc(pluginOptions),
     platformEntry(),
-    pluginOptions.purgeQueryCacheOnBuild && purgeQueryCache(),
+    suppressWarnings(),
+    pluginOptions.assetHashVersion &&
+      assetsVersion(pluginOptions.assetHashVersion),
   ] as Plugin[];
 };
+
+// @ts-ignore
+export = hydrogenPlugin; // TS syntax to support CJS interop
+export default hydrogenPlugin; // For ESM

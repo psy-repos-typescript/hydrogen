@@ -1,13 +1,11 @@
-import '../utilities/web-api-polyfill';
-import type {RequestHandler} from '../entry-server';
+import '../utilities/web-api-polyfill.js';
 import path from 'path';
-// @ts-ignore
-// eslint-disable-next-line node/no-missing-import
-import entrypoint from '__SERVER_ENTRY__';
-// @ts-ignore
-// eslint-disable-next-line node/no-missing-import
-import indexTemplate from '__INDEX_TEMPLATE__?raw';
-import {hydrogenMiddleware} from '../framework/middleware';
+import {
+  handleRequest,
+  indexTemplate,
+  relativeClientBuildPath,
+} from './virtual.js';
+import {hydrogenMiddleware} from '../framework/middleware.js';
 
 // @ts-ignore
 import serveStatic from 'serve-static';
@@ -15,15 +13,14 @@ import serveStatic from 'serve-static';
 import compression from 'compression';
 import bodyParser from 'body-parser';
 import connect, {NextHandleFunction} from 'connect';
-
-const handleRequest = entrypoint as RequestHandler;
+import {InMemoryCache} from '../framework/cache/in-memory.js';
 
 type CreateServerOptions = {
-  port?: number | string;
+  cache?: Cache;
 };
 
 export async function createServer({
-  port = process.env.PORT || 8080,
+  cache = new InMemoryCache(),
 }: CreateServerOptions = {}) {
   // @ts-ignore
   globalThis.Oxygen = {env: process.env};
@@ -33,7 +30,7 @@ export async function createServer({
   app.use(compression() as NextHandleFunction);
 
   app.use(
-    serveStatic(path.resolve(__dirname, '../client'), {
+    serveStatic(path.resolve(__dirname, relativeClientBuildPath), {
       index: false,
     }) as NextHandleFunction
   );
@@ -44,14 +41,16 @@ export async function createServer({
     hydrogenMiddleware({
       getServerEntrypoint: () => handleRequest,
       indexTemplate,
+      cache,
     })
   );
 
-  return {app, port};
+  return {app};
 }
 
 if (require.main === module) {
-  createServer().then(({app, port}) => {
+  createServer().then(({app}) => {
+    const port = process.env.PORT || 8080;
     app.listen(port, () => {
       console.log(`Hydrogen server running at http://localhost:${port}`);
     });

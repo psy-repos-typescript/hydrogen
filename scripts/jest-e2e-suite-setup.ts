@@ -1,4 +1,4 @@
-import {copy, existsSync} from 'fs-extra';
+import {existsSync} from 'fs-extra';
 import * as http from 'http';
 import {resolve, dirname, basename} from 'path';
 import sirv from 'sirv';
@@ -48,12 +48,15 @@ beforeAll(async () => {
     // start a server in that directory.
 
     const testCustomServe = resolve(
-      testPath.replace(/\.test\.([jt]s)$/, '.serve.$1')
+      dirname(testPath),
+      '..',
+      '..',
+      'test-utils',
+      basename(testPath).replace(/\.test\.([jt]s)$/, '.serve.$1')
     );
 
     if (existsSync(testCustomServe)) {
       // test has custom server configuration.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const {serve} = await import(testCustomServe);
       server = await serve(rootDir, isBuildTest);
       return;
@@ -85,10 +88,9 @@ beforeAll(async () => {
       server = await (await createServer(options)).listen();
       // use resolved port/base from server
       const base = server.config.base === '/' ? '' : server.config.base;
-      const url = ((
+      (
         global as any
-      ).viteTestUrl = `http://localhost:${server.config.server.port}${base}`);
-      await page.goto(url);
+      ).viteTestUrl = `http://localhost:${server.config.server.port}${base}`;
     } else {
       process.env.VITE_INLINE = 'inline-build';
       // determine build watch
@@ -107,8 +109,7 @@ beforeAll(async () => {
         (global as any).watcher = rollupOutput as RollupWatcher;
         await notifyRebuildComplete((global as any).watcher);
       }
-      const url = ((global as any).viteTestUrl = await startStaticServer());
-      await page.goto(url);
+      (global as any).viteTestUrl = await startStaticServer();
     }
   } catch (e) {
     // jest doesn't exit if our setup has error here
@@ -138,7 +139,9 @@ function startStaticServer(): Promise<string> {
   let config: UserConfig;
   try {
     config = require(configFile);
-  } catch (e) {}
+  } catch {
+    /**/
+  }
   const base = (config?.base || '/') === '/' ? '' : config.base;
 
   // @ts-ignore

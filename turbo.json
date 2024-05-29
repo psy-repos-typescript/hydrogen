@@ -3,7 +3,8 @@
   "baseBranch": "origin/main",
   "pipeline": {
     "build": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "cache": false
     },
     "test": {
       "outputs": []
@@ -12,8 +13,7 @@
       "outputs": []
     },
     "dev": {
-      "cache": false,
-      "dependsOn": ["@shopify/hydrogen#build"]
+      "cache": false
     }
   }
 }

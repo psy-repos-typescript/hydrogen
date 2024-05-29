@@ -1,9 +1,9 @@
 import React from 'react';
-import {Head} from '../../client';
+import {Head} from '../../foundation/Head/index.js';
+import type {Image} from '../../storefront-api-types.js';
+import type {PartialDeep} from 'type-fest';
 
-import type {Image} from './types';
-
-export function ImageSeo({url, width, height, altText}: Partial<Image>) {
+export function ImageSeo({url, width, height, altText}: PartialDeep<Image>) {
   return (
     <Head>
       {url && <meta property="og:image" content={url} />}

@@ -6,15 +6,15 @@ import {
   ExternalVideo,
   MediaHost,
   Model3d,
-} from '../../graphql/types/types';
-// eslint-disable-next-line node/no-extraneous-import
+} from '../../storefront-api-types.js';
 import faker from 'faker';
+import type {PartialDeep} from 'type-fest';
 
-export function getMediaImage(image: Partial<MediaImage> = {}) {
+export function getMediaImage(image: PartialDeep<MediaImage> = {}) {
   return {
     id: image.id ?? faker.random.words(),
     mediaContentType: MediaContentType.Image,
-    data: getPreviewImage(image.previewImage),
+    image: getPreviewImage(image.previewImage ?? undefined),
   };
 }
 
@@ -35,7 +35,7 @@ export function getVideoData(video: Partial<Video> = {}) {
   return {
     id: video.id ?? faker.random.words(),
     mediaContentType: MediaContentType.Video,
-    previewImage: getPreviewImage(video.previewImage),
+    previewImage: getPreviewImage(video.previewImage ?? undefined),
     sources: video.sources ?? [
       {mimeType: faker.system.mimeType(), url: faker.internet.url()},
       {mimeType: faker.system.mimeType(), url: faker.internet.url()},
@@ -49,12 +49,12 @@ export function getExternalVideoData(
   return {
     id: externalVideo.id ?? faker.random.words(),
     mediaContentType: MediaContentType.ExternalVideo,
-    embeddedUrl: externalVideo.embeddedUrl ?? faker.internet.url(),
+    embedUrl: externalVideo.embedUrl ?? faker.internet.url(),
     host:
       externalVideo.host ?? faker.datatype.number({max: 2, min: 1}) === 1
         ? MediaHost.Youtube
         : MediaHost.Vimeo,
-    previewImage: getPreviewImage(externalVideo.previewImage),
+    previewImage: getPreviewImage(externalVideo.previewImage ?? undefined),
   };
 }
 
@@ -63,7 +63,7 @@ export function getModel3d(model: Partial<Model3d> = {}) {
     id: model.id ?? faker.random.words(),
     mediaContentType: MediaContentType.Model_3D,
     alt: model.alt ?? faker.random.words(),
-    previewImage: getPreviewImage(model.previewImage),
+    previewImage: getPreviewImage(model.previewImage ?? undefined),
     sources: model.sources ?? [
       {url: faker.internet.url()},
       {url: faker.internet.url()},
